@@ -10,3 +10,19 @@ onlyBuiltDependencies:
   - '@nestjs/core'
   - sharp
   - msgpackr-extract
+# Security: force patched versions of transitive deps (same major only). See DECISIONS P1-4.
+overrides:
+  multer: ^2.5.0
+  body-parser: ^1.20.9
+  qs: ^6.16.1
+  node-fetch: ^2.7.0
+  bl: ^4.1.0
+  fast-csv: ^4.3.6
+  '@fast-csv/parse': ^4.3.6
+  postcss: ^8.5.23
+  sharp: ^0.35.5
+# TEMPORARY (DECISIONS Q-M1): zod 3 memory-exhaustion DoS, fixed only in zod 4.
+# Mitigated by the API's 1 MB JSON body limit. Remove when zod 4 lands (first task of P2).
+auditConfig:
+  ignoreGhsas:
+    - GHSA-mrhx-c7xc-m3w5
