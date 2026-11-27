@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing git tag to (re)build, e.g. v0.1.0'
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # attach the image tarball to the GitHub Release
+  packages: write # push to GHCR
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  images:
+    name: build · push · export images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Image name (lower-case owner)
+        id: img
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/cement-bar-${{ matrix.app }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=raw,value=${{ env.RELEASE_TAG }}
+            type=sha,format=short
+          labels: |
+            org.opencontainers.image.title=cement-bar-${{ matrix.app }}
+            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile.${{ matrix.app }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+          provenance: false # keep a plain single-arch image so `docker save/load` is simple
+
+  bundle:
+    name: offline bundle (docker save)
+    needs: images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull every image used by compose.prod.yml
+        id: pull
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          # Dummy values only to satisfy interpolation; nothing secret is produced here.
+          cat > infra/docker/.env.prod <<EOF
+          TAG=${TAG}
+          IMAGE_PREFIX=ghcr.io/${owner}
+          DOMAIN=example.invalid
+          POSTGRES_USER=x
+          POSTGRES_PASSWORD=x
+          POSTGRES_DB=x
+          REDIS_PASSWORD=x
+          EOF
+          dc() { docker compose -f infra/docker/compose.prod.yml --env-file infra/docker/.env.prod --profile backup "$@"; }
+          dc config --images | sort -u > images.txt
+          cat images.txt
+          xargs -n1 docker pull < images.txt
+          grep    '/cement-bar-' images.txt > app-images.txt
+          grep -v '/cement-bar-' images.txt > base-images.txt
+      - name: docker save
+        env:
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # shellcheck disable=SC2046
+          docker save $(cat app-images.txt)  | gzip -6 > "dist/cement-bar-images-${TAG}.tar.gz"
+          # shellcheck disable=SC2046
+          docker save $(cat base-images.txt) | gzip -6 > "dist/cement-bar-base-images-${TAG}.tar.gz"
+          cp images.txt "dist/images-${TAG}.txt"
+          (cd dist && sha256sum ./* > SHA256SUMS)
+          ls -lh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cement-bar-images-${{ env.RELEASE_TAG }}
+          path: dist/
+          retention-days: 90
+          compression-level: 0
+      - name: Attach to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+          gh release upload "$TAG" dist/* --clobber

@@ -1,0 +1,26 @@
+# Rendered by the official nginx image (envsubst) -> /etc/nginx/conf.d/http.conf
+# Port 80: ACME http-01 webroot + redirect everything else to HTTPS.
+server {
+  listen 80 default_server;
+  server_name ${DOMAIN};
+
+  location ^~ /.well-known/acme-challenge/ {
+    root /var/www/certbot;
+    default_type text/plain;
+    try_files $uri =404;
+  }
+
+  # Container healthcheck (local only).
+  location = /nginx-health {
+    access_log off;
+    allow 127.0.0.1;
+    allow ::1;
+    deny all;
+    default_type text/plain;
+    return 200 "ok\n";
+  }
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}

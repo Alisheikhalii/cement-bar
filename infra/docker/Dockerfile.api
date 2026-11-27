@@ -1,0 +1,97 @@
+# syntax=docker/dockerfile:1.7
+# -----------------------------------------------------------------------------
+# cement-bar API image (NestJS). The same image runs the BullMQ worker (WORKER=1).
+# Build context = repository root:
+#   docker build -f infra/docker/Dockerfile.api -t cement-bar-api .
+#
+# Base: node:22-bookworm-slim (Debian/glibc) rather than alpine (musl) because:
+#   - argon2 ships glibc prebuilt binaries (no compile toolchain at runtime);
+#   - Prisma's query/schema engines are best supported on debian-openssl-3.0.x,
+#     and builder and runtime share the exact same base => "native" target matches.
+# -----------------------------------------------------------------------------
+ARG NODE_IMAGE=node:22-bookworm-slim
+
+FROM ${NODE_IMAGE} AS base
+ARG PNPM_VERSION=11.11.0
+ENV CI=true \
+    PNPM_STORE=/pnpm/store \
+    TURBO_TELEMETRY_DISABLED=1 \
+    NEXT_TELEMETRY_DISABLED=1 \
+    CHECKPOINT_DISABLE=1 \
+    PRISMA_HIDE_UPDATE_MESSAGE=1
+# openssl: required by Prisma to detect libssl version. python3/make/g++: fallback
+# only, in case a native module (argon2) has no matching prebuild.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
+# pnpm pinned to root package.json "packageManager". Installed via npm instead of
+# corepack to avoid corepack signature-key drift with newer pnpm releases.
+RUN npm install -g --no-audit --no-fund "pnpm@${PNPM_VERSION}" && pnpm --version
+WORKDIR /repo
+
+# --- fetch: download every package in the lockfile into the store (layer cached
+#     until pnpm-lock.yaml changes) ------------------------------------------------
+FROM base AS fetch
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+RUN pnpm fetch --store-dir "$PNPM_STORE"
+
+# --- build ---------------------------------------------------------------------
+FROM fetch AS build
+COPY . .
+# Normalise line endings of the entrypoint in case of a CRLF checkout on Windows.
+RUN sed -i 's/\r$//' infra/scripts/api-entrypoint.sh
+RUN pnpm install --offline --frozen-lockfile --store-dir "$PNPM_STORE"
+# Build @cb/api and everything it depends on (@cb/shared, @cb/engine).
+RUN pnpm exec turbo run build --filter=@cb/api...
+# Production-only, self-contained copy of @cb/api with workspace deps injected.
+# --legacy: pnpm >=10 otherwise requires inject-workspace-packages=true.
+RUN pnpm --filter @cb/api deploy --prod --legacy --store-dir "$PNPM_STORE" /out
+# Make sure build output + prisma artefacts are present regardless of how
+# deploy's file-list heuristics treat git-ignored dirs (dist/).
+RUN rm -rf /out/dist /out/prisma \
+ && cp -r apps/api/dist /out/dist \
+ && cp -r apps/api/prisma /out/prisma
+# Generate the Prisma client (+ query engine) inside the deployed tree using the
+# workspace's pinned Prisma CLI (prisma is a devDependency of @cb/api).
+RUN cd /out && /repo/apps/api/node_modules/.bin/prisma generate --schema=prisma/schema.prisma
+# Prisma CLI is needed at runtime only for `prisma migrate deploy`. If it is not a
+# production dependency of @cb/api, install the *same pinned version* in an
+# isolated prefix (see README / DECISIONS: recommend moving `prisma` to deps).
+RUN mkdir -p /opt/prisma-cli \
+ && if [ ! -e /out/node_modules/prisma/package.json ]; then \
+      PRISMA_VERSION="$(node -p "require('/repo/apps/api/node_modules/prisma/package.json').version")" \
+      && npm install --prefix /opt/prisma-cli --no-audit --no-fund --omit=dev "prisma@${PRISMA_VERSION}"; \
+    fi
+# Fail the build early if the deployed tree is not runnable.
+RUN cd /out \
+ && test -f dist/main.js \
+ && test -d prisma/migrations \
+ && node -e "require('@cb/shared');require('@cb/engine');require('argon2');new (require('@prisma/client').PrismaClient)();console.log('api deploy tree OK')"
+
+# --- runtime -------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS runtime
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tini openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production \
+    TZ=UTC \
+    API_PORT=4000 \
+    UPLOAD_DIR=/app/uploads \
+    CHECKPOINT_DISABLE=1 \
+    PRISMA_HIDE_UPDATE_MESSAGE=1
+WORKDIR /app
+# Application files are owned by root and therefore read-only for the `node` user.
+COPY --from=build /out /app
+COPY --from=build /opt/prisma-cli /opt/prisma-cli
+COPY --from=build /repo/infra/scripts/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/api-entrypoint.sh \
+ && mkdir -p /app/uploads \
+ && chown node:node /app/uploads
+# Only writable paths at runtime: /app/uploads (volume) and /tmp (tmpfs).
+VOLUME ["/app/uploads"]
+USER node
+EXPOSE 4000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.API_PORT||4000)+'/api/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/api-entrypoint.sh"]
+CMD ["node", "dist/main.js"]

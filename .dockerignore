@@ -1,0 +1,42 @@
+# Build context = repo root. Keep it small and secret-free.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/playwright-report
+**/test-results
+**/*.log
+.pnpm-store
+
+# VCS / tooling
+.git
+.github
+.claude
+.vscode
+.idea
+**/.DS_Store
+
+# secrets — never send to the daemon (repo is public, images too)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+*.pem
+*.key
+secrets
+
+# runtime data
+uploads
+backups
+apps/api/uploads
+
+# not needed for image builds
+docs
+infra/k6
+infra/zap
+infra/nginx
+infra/docker
+README.md
