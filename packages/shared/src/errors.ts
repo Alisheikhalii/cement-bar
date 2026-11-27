@@ -33,6 +33,11 @@ export const ERRORS = {
   NO_UNIT_AVAILABLE: { status: 409, fa: 'بار قابل رزروی باقی نمانده است' },
   QUOTA_EXCEEDED: { status: 403, fa: 'ثبت این اعلام بار از سهمیه ماهانه باربری بیشتر است' },
   CANCEL_PENDING: { status: 409, fa: 'درخواست لغو قبلی در حال بررسی است' },
+  QUOTA_NOT_SET: { status: 403, fa: 'سهمیه ماهانه این باربری برای ماه اعلام بار تعیین نشده است' },
+  CARRIER_SUSPENDED: { status: 403, fa: 'باربری تعلیق شده است' },
+  FILE_INVALID: { status: 400, fa: 'فقط فایل اکسل (xlsx) مجاز است' },
+  FILE_TOO_LARGE: { status: 413, fa: 'حجم فایل بیش از حد مجاز است' },
+  HAS_ACTIVE_RESERVATIONS: { status: 409, fa: 'این مورد رزرو فعال دارد و قابل تغییر نیست' },
   INVALID_STATE: { status: 409, fa: 'این عملیات در وضعیت فعلی امکان‌پذیر نیست' },
 } as const;
 

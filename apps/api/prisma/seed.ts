@@ -1,6 +1,6 @@
 /* Idempotent development seed: `pnpm --filter @cb/api db:seed` (re-runnable). */
 import { PrismaClient, type Strategy } from '@prisma/client';
-import { bulkPolicyParams, freePolicyParams, timedPolicyParams } from '@cb/shared';
+import { bulkPolicyParams, freePolicyParams, jalaliYearMonth, timedPolicyParams } from '@cb/shared';
 import { loadConfig, loadDotEnv } from '../src/config/app-config';
 import { FieldCrypto } from '../src/common/crypto/field-crypto';
 import { hashPassword } from '../src/modules/auth/password.service';
@@ -196,6 +196,23 @@ async function seedDriver(ctx: DriverCtx, i: number, status: 'APPROVED' | 'PENDI
   });
 }
 
+/** Monthly quotas for this and next Jalali month (quota is mandatory — DECISIONS D12) + a shared loading location. */
+async function seedCarrierOps(tenantId: string, carrierIds: string[], cityId: number): Promise<void> {
+  const now = new Date();
+  const months = [jalaliYearMonth(now), jalaliYearMonth(new Date(now.getTime() + 32 * 86_400_000))];
+  for (const carrierId of carrierIds) {
+    for (const yearMonth of months) {
+      await prisma.carrierQuota.upsert({
+        where: { carrierId_yearMonth: { carrierId, yearMonth } },
+        update: {},
+        create: { tenantId, carrierId, yearMonth, tonnageLimitKg: BigInt(D.MONTHLY_QUOTA_KG) },
+      });
+    }
+  }
+  const found = await prisma.loadingLocation.findFirst({ where: { tenantId, carrierId: null, name: D.FACTORY_LOADING_LOCATION.name } });
+  if (!found) await prisma.loadingLocation.create({ data: { tenantId, carrierId: null, cityId, ...D.FACTORY_LOADING_LOCATION } });
+}
+
 async function main(): Promise<void> {
   const started = Date.now();
   // Hash each distinct password once (argon2id is intentionally slow).
@@ -209,6 +226,7 @@ async function main(): Promise<void> {
   const loaderIds = await seedMasterData(tenantId);
   await seedHalls(tenantId);
   const carrierIds = await seedOperators(tenantId, { factory, carrier });
+  await seedCarrierOps(tenantId, carrierIds, cityIds.get('نی‌ریز')!);
   const ctx: DriverCtx = {
     tenantId,
     carrierIds,
