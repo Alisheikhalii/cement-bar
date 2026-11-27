@@ -51,7 +51,7 @@ export function RegisterWizard() {
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<RegisterForm>({
     // raw: submit the un-transformed input (API expects plate as {two,letter,three,iran}).
-    resolver: zodResolver(registerFormSchema, { errorMap: faErrorMap }, { raw: true }),
+    resolver: zodResolver(registerFormSchema, { error: faErrorMap }, { raw: true }),
     mode: 'onTouched',
     defaultValues: {
       mobile: '',
