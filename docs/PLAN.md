@@ -51,6 +51,8 @@
 
 ## P2 — دامنه و پنل‌ها (`v0.2.0`)
 
+**کار صفر (پیش از قراردادها، DECISIONS Q-M1):** مهاجرت `zod` به v4 و `@hookform/resolvers` به v5، سپس حذف `auditConfig.ignoreGhsas` از `pnpm-workspace.yaml` و سبز کردن `pnpm audit --prod --audit-level high`.
+
 **قرارداد (ایجنت اصلی):** schemaهای Zod همه منابع، پیکربندی ستون‌های اعلام بار و مجوز (SPEC §۲.۴)، و `DataTable` سمت سرور به‌همراه helper خروجی xlsx.
 
 **موازی (۴ ساب‌ایجنت؛ هر کدام API + UI یک برش عمودی):**

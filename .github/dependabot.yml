@@ -1,0 +1,40 @@
+version: 2
+updates:
+  - package-ecosystem: npm # pnpm lockfile is supported via the npm ecosystem
+    directory: /
+    schedule:
+      interval: weekly
+      day: saturday
+      timezone: Asia/Tehran
+    open-pull-requests-limit: 10
+    versioning-strategy: increase-if-necessary
+    groups:
+      prod-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore(deps)
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: saturday
+      timezone: Asia/Tehran
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: chore(ci)
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
+      day: saturday
+      timezone: Asia/Tehran
+    commit-message:
+      prefix: chore(docker)

@@ -1,0 +1,1025 @@
+// Cement-bar data model — source: docs/SPEC.md §2
+// Conventions: table names snake_case (@@map), columns camelCase, times timestamptz (UTC),
+// money = BigInt rial, weight = Int kg. Critical DB constraints that Prisma cannot express
+// (partial unique, exclusion, append-only triggers) live in raw SQL migrations.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── enums ─────────────────────────
+enum Role {
+  FACTORY_OPERATOR
+  CARRIER_OPERATOR
+  DRIVER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum CarrierStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum DriverStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  BLOCKED
+}
+
+enum VehicleStatus {
+  APPROVED
+  PENDING_CHANGE
+}
+
+enum HallCategory {
+  BAG
+  BULK
+}
+
+enum PackagingCategory {
+  BAG
+  BULK
+}
+
+enum Allocation {
+  GROUP
+  TIMED
+  FREE
+}
+
+enum HallDayStatus {
+  SCHEDULED
+  OPEN
+  ALLOCATING
+  CLOSED
+  HALTED
+  CANCELLED
+}
+
+enum Strategy {
+  TIMED_PRIORITY_RESERVATION
+  BULK_GROUP_ROTATION
+  FREE_FIRST_COME
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum FareCalc {
+  PER_TRUCK
+  PER_TON
+}
+
+enum UnitState {
+  OPEN
+  RESERVED
+  CONSUMED
+  CANCELLED
+  HELD
+}
+
+enum BagTurnStatus {
+  WAITING
+  ALLOCATED
+  NOT_ALLOCATED
+  CANCELLED
+}
+
+enum BulkWindowKind {
+  HEAD
+  FREE
+}
+
+enum WindowCloseReason {
+  TIME
+  EXHAUSTED
+  ALL_RESERVED
+  MANUAL
+  HALL_END
+  HALTED
+}
+
+enum ReservationSource {
+  TIMED
+  GROUP
+  FREE
+  MANUAL
+}
+
+enum ReservationStatus {
+  RESERVED
+  ARRIVED
+  LOADED
+  EXITED
+  CANCEL_REQUESTED
+  CANCELLED
+  NO_SHOW
+  RETURNED
+}
+
+enum CancelRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PenaltyReason {
+  CANCEL_APPROVED
+  MANUAL
+}
+
+// ───────────────────────── identity ─────────────────────────
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  timezone  String   @default("Asia/Tehran")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  users    User[]
+  carriers Carrier[]
+  halls    Hall[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @db.Uuid
+  role         Role
+  username     String?    @unique
+  mobile       String?    @unique
+  displayName  String
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  carrierId    String?    @db.Uuid // for CARRIER_OPERATOR
+  failedLogins Int        @default(0)
+  lockedUntil  DateTime?  @db.Timestamptz(3)
+  lastLoginAt  DateTime?  @db.Timestamptz(3)
+  mustChangePassword Boolean @default(false)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
+  createdBy    String?    @db.Uuid
+  deletedAt    DateTime?  @db.Timestamptz(3)
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  carrier       Carrier?       @relation(fields: [carrierId], references: [id])
+  sessions      Session[]
+  driver        Driver?
+  notifications Notification[]
+
+  @@index([tenantId, role])
+  @@index([carrierId])
+  @@map("users")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  familyId         String    @db.Uuid
+  refreshTokenHash String    @unique
+  deviceInfo       String?
+  ip               String?
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  lastUsedAt       DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt        DateTime  @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+  revokeReason     String?
+  replacedById     String?   @db.Uuid
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+/// Append-only (enforced by trigger). Never UPDATE/DELETE.
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @db.Uuid
+  actorId   String?  @db.Uuid
+  actorRole Role?
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  reason    String?
+  ip        String?
+  userAgent String?
+  requestId String?
+  at        DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([tenantId, at])
+  @@index([entity, entityId])
+  @@index([actorId, at])
+  @@map("audit_logs")
+}
+
+// ───────────────────────── organisation & master data ─────────────────────────
+model Carrier {
+  id         String        @id @default(uuid()) @db.Uuid
+  tenantId   String        @db.Uuid
+  code       String
+  name       String
+  phone      String?
+  address    String?
+  nationalId String?
+  status     CarrierStatus @default(ACTIVE)
+  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime      @updatedAt @db.Timestamptz(3)
+  createdBy  String?       @db.Uuid
+  deletedAt  DateTime?     @db.Timestamptz(3)
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  users         User[]
+  quotas        CarrierQuota[]
+  drivers       Driver[]
+  announcements Announcement[]
+  dailyFiles    DailyFile[]
+  bulkGroups    BulkGroup[]
+
+  @@unique([tenantId, code])
+  @@map("carriers")
+}
+
+model CarrierQuota {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  carrierId     String   @db.Uuid
+  yearMonth     String // jalali "1405-09"
+  tonnageLimitKg BigInt
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  createdBy     String?  @db.Uuid
+
+  carrier Carrier @relation(fields: [carrierId], references: [id])
+
+  @@unique([carrierId, yearMonth])
+  @@map("carrier_quotas")
+}
+
+model Province {
+  id     Int    @id
+  name   String @unique
+  cities City[]
+
+  @@map("provinces")
+}
+
+model City {
+  id         Int    @id
+  provinceId Int
+  name       String
+
+  province     Province      @relation(fields: [provinceId], references: [id])
+  destinations Destination[]
+
+  @@unique([provinceId, name])
+  @@map("cities")
+}
+
+model Destination {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  cityId    Int
+  title     String
+  active    Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  city City @relation(fields: [cityId], references: [id])
+
+  @@unique([tenantId, cityId])
+  @@map("destinations")
+}
+
+model LoaderType {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  code      String
+  title     String
+  active    Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@unique([tenantId, code])
+  @@map("loader_types")
+}
+
+model PackagingType {
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @db.Uuid
+  title     String
+  category  PackagingCategory
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
+  createdBy String?           @db.Uuid
+  deletedAt DateTime?         @db.Timestamptz(3)
+
+  @@map("packaging_types")
+}
+
+model Product {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  title     String
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@map("products")
+}
+
+model Hall {
+  id                String       @id @default(uuid()) @db.Uuid
+  tenantId          String       @db.Uuid
+  title             String
+  category          HallCategory
+  defaultAllocation Allocation
+  terminalName      String?
+  terminalCity      String?
+  active            Boolean      @default(true)
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @db.Timestamptz(3)
+  createdBy         String?      @db.Uuid
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id])
+  schedules HallSchedule[]
+  days      HallDay[]
+  policies  QueuePolicy[]
+
+  @@map("halls")
+}
+
+/// Weekly schedule; times are local "HH:mm" in BUSINESS_TIMEZONE.
+model HallSchedule {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  hallId      String   @db.Uuid
+  weekday     Int // 0=Saturday … 6=Friday (Iranian week)
+  t0          String
+  priorityEnd String?
+  hallEnd     String
+  headMinutes Int?
+  freeMinutes Int?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+  createdBy   String?  @db.Uuid
+
+  hall Hall @relation(fields: [hallId], references: [id])
+
+  @@unique([hallId, weekday])
+  @@map("hall_schedules")
+}
+
+model HallDay {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @db.Uuid
+  hallId         String        @db.Uuid
+  date           String // local jalali-independent ISO date "2026-11-27" in BUSINESS_TIMEZONE
+  t0At           DateTime      @db.Timestamptz(3)
+  priorityEndAt  DateTime?     @db.Timestamptz(3)
+  hallEndAt      DateTime      @db.Timestamptz(3)
+  status         HallDayStatus @default(SCHEDULED)
+  policySnapshot Json?
+  turnSeq        Int           @default(0)
+  haltedReason   String?
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @db.Timestamptz(3)
+  createdBy      String?       @db.Uuid
+
+  hall           Hall            @relation(fields: [hallId], references: [id])
+  announcements  Announcement[]
+  bagTurns       BagTurn[]
+  allocationRun  AllocationRun?
+  bulkDays       BulkDay[]
+  reservations   Reservation[]
+
+  @@unique([hallId, date])
+  @@index([status, t0At])
+  @@map("hall_days")
+}
+
+model QueuePolicy {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  hallId     String   @db.Uuid
+  strategy   Strategy
+  version    Int
+  params     Json
+  activeFrom DateTime @db.Timestamptz(3)
+  note       String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  createdBy  String?  @db.Uuid
+
+  hall Hall @relation(fields: [hallId], references: [id])
+
+  @@unique([hallId, strategy, version])
+  @@map("queue_policies")
+}
+
+model Party {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  carrierId     String    @db.Uuid
+  title         String
+  name          String
+  nationalIdEnc String
+  nationalIdHash String
+  economicCode  String?
+  addresses     Json      @default("[]")
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy     String?   @db.Uuid
+  deletedAt     DateTime? @db.Timestamptz(3)
+
+  @@index([carrierId])
+  @@map("parties")
+}
+
+model GoodsOwner {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  carrierId     String    @db.Uuid
+  name          String
+  nationalIdEnc String
+  nationalIdHash String
+  phone         String?
+  mobile        String?
+  otherInfo     String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy     String?   @db.Uuid
+  deletedAt     DateTime? @db.Timestamptz(3)
+
+  @@index([carrierId])
+  @@map("goods_owners")
+}
+
+model LoadingLocation {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  carrierId     String?   @db.Uuid
+  warehouseType String
+  name          String
+  nationalCode  String?
+  nature        String?
+  cityId        Int?
+  address       String?
+  phone         String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy     String?   @db.Uuid
+  deletedAt     DateTime? @db.Timestamptz(3)
+
+  @@index([carrierId])
+  @@map("loading_locations")
+}
+
+model CargoDescription {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  carrierId String?   @db.Uuid
+  text      String
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@index([carrierId])
+  @@map("cargo_descriptions")
+}
+
+model LoadingCondition {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  carrierId String?   @db.Uuid
+  name      String?
+  condition String
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  @@index([carrierId])
+  @@map("loading_conditions")
+}
+
+model DailyFile {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  carrierId    String    @db.Uuid
+  forDate      String // ISO local date
+  fileKey      String    @unique
+  originalName String
+  size         Int
+  sha256       String
+  note         String?
+  uploadedBy   String    @db.Uuid
+  seenAt       DateTime? @db.Timestamptz(3)
+  seenBy       String?   @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  deletedAt    DateTime? @db.Timestamptz(3)
+
+  carrier Carrier @relation(fields: [carrierId], references: [id])
+
+  @@index([carrierId, forDate])
+  @@map("daily_files")
+}
+
+// ───────────────────────── drivers ─────────────────────────
+model Driver {
+  id               String       @id @default(uuid()) @db.Uuid
+  tenantId         String       @db.Uuid
+  userId           String       @unique @db.Uuid
+  carrierId        String       @db.Uuid
+  status           DriverStatus @default(PENDING)
+  firstName        String
+  lastName         String
+  nationalIdEnc    String
+  nationalIdHash   String       @unique
+  licenseNo        String
+  licenseIssueDate DateTime     @db.Date
+  birthCityId      Int?
+  birthDate        DateTime?    @db.Date
+  residenceCityId  Int?
+  address          String?
+  postalCode       String?
+  phone            String?
+  bankName         String?
+  accountNo        String?
+  shebaEnc         String?
+  healthCardExpiry DateTime     @db.Date
+  blockedUntil     DateTime?    @db.Timestamptz(3)
+  blockReason      String?
+  decidedBy        String?      @db.Uuid
+  decidedAt        DateTime?    @db.Timestamptz(3)
+  decisionNote     String?
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(3)
+  createdBy        String?      @db.Uuid
+  deletedAt        DateTime?    @db.Timestamptz(3)
+
+  user         User               @relation(fields: [userId], references: [id])
+  carrier      Carrier            @relation(fields: [carrierId], references: [id])
+  vehicles     Vehicle[]
+  penalties    DriverPenalty[]
+  memberships  BulkGroupMember[]
+  bagTurns     BagTurn[]
+  reservations Reservation[]
+  cancelRequests CancelRequest[]
+
+  @@index([carrierId, status])
+  @@map("drivers")
+}
+
+model Vehicle {
+  id                String        @id @default(uuid()) @db.Uuid
+  tenantId          String        @db.Uuid
+  driverId          String        @db.Uuid
+  smartCardNo       String        @unique
+  plate             String        @unique // normalized "65ع576-98"
+  loaderTypeId      String        @db.Uuid
+  status            VehicleStatus @default(APPROVED)
+  pendingChange     Json? // {plate, loaderTypeId, smartCardNo} awaiting carrier approval
+  smartCardExpiry   DateTime      @db.Date
+  inspectionExpiry  DateTime      @db.Date
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+  createdBy         String?       @db.Uuid
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@index([driverId, active])
+  @@map("vehicles")
+}
+
+model DriverPenalty {
+  id                  String        @id @default(uuid()) @db.Uuid
+  tenantId            String        @db.Uuid
+  driverId            String        @db.Uuid
+  reason              PenaltyReason
+  until               DateTime      @db.Timestamptz(3)
+  sourceReservationId String?       @db.Uuid
+  note                String?
+  createdAt           DateTime      @default(now()) @db.Timestamptz(3)
+  createdBy           String?       @db.Uuid
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@index([driverId, until])
+  @@map("driver_penalties")
+}
+
+// ───────────────────────── announcements & units ─────────────────────────
+model Announcement {
+  id         String             @id @default(uuid()) @db.Uuid
+  tenantId   String             @db.Uuid
+  carrierId  String             @db.Uuid
+  hallId     String             @db.Uuid
+  hallDayId  String?            @db.Uuid
+  number     Int
+  status     AnnouncementStatus @default(ACTIVE)
+  // initial section
+  announceDate String // ISO local date
+  announceTime String // HH:mm
+  orderCode    String?
+  contractNo   String?
+  unloadCode   String?
+  // sender
+  senderPartyId       String? @db.Uuid
+  senderName          String?
+  senderNationalIdEnc String?
+  originCityId        Int?
+  senderPostal        String?
+  senderAddress       String?
+  // receiver
+  receiverPartyId       String? @db.Uuid
+  receiverName          String?
+  receiverNationalIdEnc String?
+  destCityId            Int?
+  destinationId         String? @db.Uuid
+  receiverPostal        String?
+  receiverAddress       String?
+  // cargo
+  productId          String  @db.Uuid
+  cargoDescriptionId String? @db.Uuid
+  packagingTypeId    String  @db.Uuid
+  cargoValue         BigInt
+  cargoCount         Int?
+  // loading
+  loadingLocationId String    @db.Uuid
+  warehouseName     String?
+  loadingDate       String?
+  loadingEndDate    String?
+  loadingFrom       String?
+  loadingTo         String?
+  loadingPlaceText  String?
+  // weight & fare
+  fareCalc           FareCalc
+  loaderTypeId       String   @db.Uuid
+  loaderType2Id      String?  @db.Uuid
+  truckCount         Int
+  loaderLength       Int?
+  requestedTruckType String?
+  weightFromKg       Int
+  weightToKg         Int
+  destFareType       String
+  farePerTruck       BigInt?
+  ratePerTon         BigInt?
+  // other
+  goodsOwnerId String? @db.Uuid
+  waybillNote  String?
+  description  String
+  isFreeOutsideDestinations Boolean @default(false)
+  extra        Json    @default("{}")
+  cancelReason String?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy    String?   @db.Uuid
+  deletedAt    DateTime? @db.Timestamptz(3)
+
+  carrier Carrier    @relation(fields: [carrierId], references: [id])
+  hallDay HallDay?   @relation(fields: [hallDayId], references: [id])
+  units   LoadUnit[]
+  bagPriorities BagPriority[]
+
+  @@unique([tenantId, number])
+  @@index([hallId, status, createdAt])
+  @@index([carrierId, status])
+  @@index([destCityId, status])
+  @@index([hallDayId])
+  @@map("announcements")
+}
+
+model LoadUnit {
+  id                   String     @id @default(uuid()) @db.Uuid
+  tenantId             String     @db.Uuid
+  announcementId       String     @db.Uuid
+  seq                  Int
+  allocation           Allocation
+  state                UnitState  @default(OPEN)
+  currentReservationId String?    @db.Uuid
+  version              Int        @default(0)
+  createdAt            DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime   @updatedAt @db.Timestamptz(3)
+
+  announcement      Announcement               @relation(fields: [announcementId], references: [id])
+  allocationChanges LoadUnitAllocationChange[]
+  reservations      Reservation[]
+
+  @@unique([announcementId, seq])
+  @@index([announcementId, state, allocation])
+  @@map("load_units")
+}
+
+model LoadUnitAllocationChange {
+  id        String     @id @default(uuid()) @db.Uuid
+  tenantId  String     @db.Uuid
+  unitId    String     @db.Uuid
+  from      Allocation
+  to        Allocation
+  reason    String
+  actorId   String     @db.Uuid
+  at        DateTime   @default(now()) @db.Timestamptz(3)
+
+  unit LoadUnit @relation(fields: [unitId], references: [id])
+
+  @@index([unitId])
+  @@map("load_unit_allocation_changes")
+}
+
+// ───────────────────────── queueing ─────────────────────────
+model BagTurn {
+  id           String        @id @default(uuid()) @db.Uuid
+  tenantId     String        @db.Uuid
+  hallDayId    String        @db.Uuid
+  driverId     String        @db.Uuid
+  turnNo       Int
+  registeredAt DateTime      @db.Timestamptz(6)
+  status       BagTurnStatus @default(WAITING)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
+
+  hallDay    HallDay       @relation(fields: [hallDayId], references: [id])
+  driver     Driver        @relation(fields: [driverId], references: [id])
+  priorities BagPriority[]
+
+  @@unique([hallDayId, driverId])
+  @@unique([hallDayId, turnNo])
+  @@map("bag_turns")
+}
+
+model BagPriority {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  turnId         String   @db.Uuid
+  rank           Int
+  announcementId String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  turn         BagTurn      @relation(fields: [turnId], references: [id], onDelete: Cascade)
+  announcement Announcement @relation(fields: [announcementId], references: [id])
+
+  @@unique([turnId, rank])
+  @@unique([turnId, announcementId])
+  @@map("bag_priorities")
+}
+
+model AllocationRun {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  hallDayId     String    @unique @db.Uuid
+  input         Json
+  output        Json
+  inputHash     String
+  outputHash    String
+  engineVersion String
+  startedAt     DateTime  @db.Timestamptz(3)
+  finishedAt    DateTime  @db.Timestamptz(3)
+
+  hallDay HallDay @relation(fields: [hallDayId], references: [id])
+
+  @@map("allocation_runs")
+}
+
+model BulkGroup {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  carrierId String    @db.Uuid
+  hallId    String    @db.Uuid
+  title     String
+  sortOrder Int
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  createdBy String?   @db.Uuid
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  carrier Carrier           @relation(fields: [carrierId], references: [id])
+  members BulkGroupMember[]
+
+  @@index([carrierId, hallId, sortOrder])
+  @@map("bulk_groups")
+}
+
+/// Exclusion constraint (raw SQL): one active membership per driver per date range.
+model BulkGroupMember {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @db.Uuid
+  groupId       String    @db.Uuid
+  driverId      String    @db.Uuid
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  createdBy     String?   @db.Uuid
+  reason        String?
+
+  group  BulkGroup @relation(fields: [groupId], references: [id])
+  driver Driver    @relation(fields: [driverId], references: [id])
+
+  @@index([groupId])
+  @@index([driverId])
+  @@map("bulk_group_members")
+}
+
+model BulkRotationState {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @db.Uuid
+  carrierId         String   @db.Uuid
+  hallId            String   @db.Uuid
+  nextHeadGroupId   String?  @db.Uuid
+  cursorGroupId     String?  @db.Uuid
+  cursorRemaining   String[] @db.Uuid
+  cursorInitialized Boolean  @default(false)
+  settings          Json     @default("{}") // maxLoadsPerDriverPerDay, leftoverAtHallEnd …
+  version           Int      @default(0)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([carrierId, hallId])
+  @@map("bulk_rotation_state")
+}
+
+model BulkDay {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @db.Uuid
+  carrierId       String   @db.Uuid
+  hallDayId       String   @db.Uuid
+  headGroupId     String   @db.Uuid
+  membersSnapshot Json
+  stateBefore     Json
+  stateAfter      Json?
+  status          String   @default("OPEN")
+  haltedReason    String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  hallDay HallDay      @relation(fields: [hallDayId], references: [id])
+  windows BulkWindow[]
+
+  @@unique([carrierId, hallDayId])
+  @@map("bulk_days")
+}
+
+model BulkWindow {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String             @db.Uuid
+  bulkDayId   String             @db.Uuid
+  seq         Int
+  kind        BulkWindowKind
+  round       Int
+  groupId     String             @db.Uuid
+  eligible    String[]           @db.Uuid
+  opensAt     DateTime           @db.Timestamptz(3)
+  closesAt    DateTime           @db.Timestamptz(3)
+  closedAt    DateTime?          @db.Timestamptz(3)
+  closeReason WindowCloseReason?
+  burned      String[]           @db.Uuid
+  carried     String[]           @db.Uuid
+  skipped     String[]           @db.Uuid
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+
+  bulkDay      BulkDay       @relation(fields: [bulkDayId], references: [id])
+  reservations Reservation[]
+
+  @@unique([bulkDayId, seq])
+  @@map("bulk_windows")
+}
+
+/// Reservation == permit. Partial unique index (raw SQL): one active reservation per unit.
+model Reservation {
+  id              String            @id @default(uuid()) @db.Uuid
+  tenantId        String            @db.Uuid
+  permitNo        Int
+  unitId          String            @db.Uuid
+  driverId        String            @db.Uuid
+  carrierId       String            @db.Uuid // owner of the load
+  source          ReservationSource
+  hallDayId       String?           @db.Uuid
+  bulkWindowId    String?           @db.Uuid
+  allocationRunId String?           @db.Uuid
+  status          ReservationStatus @default(RESERVED)
+  statusBeforeCancelRequest ReservationStatus?
+  idempotencyKey  String?
+  reservedAt      DateTime          @db.Timestamptz(6)
+  arrivedAt       DateTime?         @db.Timestamptz(3)
+  loadedAt        DateTime?         @db.Timestamptz(3)
+  exitedAt        DateTime?         @db.Timestamptz(3)
+  cancelledAt     DateTime?         @db.Timestamptz(3)
+  returnReason    String?
+  manualReason    String?
+  ip              String?
+  userAgent       String?
+  extra           Json              @default("{}")
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime          @updatedAt @db.Timestamptz(3)
+  createdBy       String?           @db.Uuid
+
+  unit           LoadUnit        @relation(fields: [unitId], references: [id])
+  driver         Driver          @relation(fields: [driverId], references: [id])
+  hallDay        HallDay?        @relation(fields: [hallDayId], references: [id])
+  bulkWindow     BulkWindow?     @relation(fields: [bulkWindowId], references: [id])
+  cancelRequests CancelRequest[]
+
+  @@unique([tenantId, permitNo])
+  @@unique([driverId, idempotencyKey])
+  @@index([driverId, status])
+  @@index([carrierId, status, reservedAt])
+  @@index([hallDayId])
+  @@map("reservations")
+}
+
+model CancelRequest {
+  id            String              @id @default(uuid()) @db.Uuid
+  tenantId      String              @db.Uuid
+  reservationId String              @db.Uuid
+  driverId      String              @db.Uuid
+  carrierId     String              @db.Uuid
+  reason        String
+  status        CancelRequestStatus @default(PENDING)
+  decidedBy     String?             @db.Uuid
+  decidedAt     DateTime?           @db.Timestamptz(3)
+  decisionNote  String?
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
+
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+  driver      Driver      @relation(fields: [driverId], references: [id])
+
+  @@index([carrierId, status])
+  @@map("cancel_requests")
+}
+
+/// Append-only (enforced by trigger).
+model QueueEvent {
+  seq       BigInt   @id @default(autoincrement())
+  tenantId  String   @db.Uuid
+  hallDayId String?  @db.Uuid
+  carrierId String?  @db.Uuid
+  type      String
+  payload   Json
+  actorId   String?  @db.Uuid
+  at        DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+
+  @@index([hallDayId, seq])
+  @@index([carrierId, seq])
+  @@index([type])
+  @@map("queue_events")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @db.Uuid
+  userId    String    @db.Uuid
+  type      String
+  title     String
+  body      String
+  data      Json      @default("{}")
+  readAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// Monotonic counters (announcement number, permit number) per tenant.
+model Counter {
+  tenantId String @db.Uuid
+  name     String
+  value    Int    @default(0)
+
+  @@id([tenantId, name])
+  @@map("counters")
+}

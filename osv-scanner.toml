@@ -1,0 +1,108 @@
+# osv-scanner policy (owner decision: DECISIONS Q-M2).
+# Every entry is a KNOWN advisory with no same-major fix, a reason, and an expiry.
+# Anything NOT listed fails CI. Expiry forces re-triage; remove entries as upgrades land.
+
+[[IgnoredVulns]]
+id = "GHSA-36xv-jgw5-4q75"
+ignoreUntil = 2027-01-31
+reason = "@nestjs/core@10.4.22 [moderate, prod] @nestjs/core Improperly Neutralizes Special Elements in Output Used by a Downstream Component ('Injection'). Fixed in >=11.1.18; P4: NestJS 11 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-qxg6-89mg-rqv8"
+ignoreUntil = 2027-01-31
+reason = "@vitest/mocker@2.1.9 [moderate, dev-only] Vitest: Code injection via unauthenticated manual mock registration. Fixed in >=4.1.12; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-67mh-4wv8-2f99"
+ignoreUntil = 2027-01-31
+reason = "esbuild@0.21.3, 0.24.0 [moderate, dev-only] esbuild enables any website to send any requests to the development server and read the response. Fixed in >=0.24.3; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-5v7r-6r5c-r473"
+ignoreUntil = 2027-01-31
+reason = "file-type@20.4.1 [moderate, prod] file-type affected by infinite loop in ASF parser on malformed input with zero-size sub-header. Fixed in >=21.3.1; P4: NestJS 11 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-j47w-4g3g-c36v"
+ignoreUntil = 2027-01-31
+reason = "file-type@20.4.1 [moderate, prod] file-type: ZIP Decompression Bomb DoS via [Content_Types].xml entry. Fixed in >=21.3.2; P4: NestJS 11 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2027-01-31
+reason = "glob@10.5.0 [moderate, dev-only] Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal. Fixed in >=14.0.2; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-01-31
+reason = "minimatch@9.0.9, 10.2.6 [moderate, dev-only] minimatch has potential denial of service via globparts amplification. Fixed in >=11.0.1; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-5gmw-xhrv-c9v3"
+ignoreUntil = 2027-01-31
+reason = "tinypool@1.0.1 [critical, dev-only] Tinypool: Prototype Pollution gadget in worker options leads to Remote Code Execution. Fixed in >=2.1.1; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-85c8-ppgw-ccpr"
+ignoreUntil = 2027-01-31
+reason = "tinypool@1.0.1 [critical, dev-only] Tinypool: Prototype Pollution Gadget to RCE in run() options. Fixed in >=2.1.2; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+ignoreUntil = 2027-01-31
+reason = "uuid@8.3.0 [moderate, prod] uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided. Fixed in >=11.1.1; P4: exceljs upgrade/replacement."
+
+[[IgnoredVulns]]
+id = "GHSA-4w7w-66w2-5vf9"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [moderate, dev-only] Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling. Fixed in >=6.4.2; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-587h-7wmj-h5pm"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [high, dev-only] launch-editor: `fs.existsSync()` existence check can be bypassed on Windows. Fixed in >=6.4.4; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-698v-4r3x-3vcv"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [moderate, dev-only] launch-editor: escapeCmdArgs() omits % escaping on Windows. Fixed in >=6.4.4; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-9jrq-w75r-8gcw"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [low, dev-only] Vite: Cross origin script execution through Vite custom middleware. Fixed in >=6.4.4; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-fx2h-pf6j-xcff"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [moderate, dev-only] vite: `server.fs.deny` bypass on Windows alternate paths. Fixed in >=6.4.3; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-r825-w8mm-5pxw"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [moderate, dev-only] launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors. Fixed in >=6.4.4; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-rq7h-c2jc-7f22"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [moderate, dev-only] Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine. Fixed in >=6.4.4; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-v6wh-96g9-6wx3"
+ignoreUntil = 2027-01-31
+reason = "vite@5.4.21 [moderate, dev-only] launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows. Fixed in >=6.4.3; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-5xrq-8626-4rwp"
+ignoreUntil = 2027-01-31
+reason = "vitest@2.1.9 [critical, dev-only] When Vitest UI server is listening, arbitrary file can be read and executed. Fixed in >=3.2.6; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-82fw-gwwq-j7x9"
+ignoreUntil = 2027-01-31
+reason = "vitest@2.1.9 [moderate, dev-only] Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock. Fixed in >=4.1.11; P4: vitest 4 upgrade."
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2027-01-31
+reason = "zod@3.24.1 [high, prod; mitigated by 1 MB JSON body limit] Zod can exhaust memory while validating oversized constrained collections. Fixed in >=4.6.6; P2 task zero: zod 4 migration (Q-M1)."

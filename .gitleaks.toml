@@ -1,0 +1,23 @@
+# gitleaks configuration — the repository is PUBLIC, every commit is scanned in CI.
+title = "cement-bar gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders, dev-only credentials and test fixtures"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)test/''',
+  '''(^|/)tests/''',
+  '''(^|/)__fixtures__/''',
+  '''(^|/)fixtures/''',
+  '''\.(test|spec|int-spec|e2e-spec)\.[cm]?[jt]sx?$''',
+  '''(^|/)pnpm-lock\.yaml$''',
+]
+regexes = [
+  '''change-me''',
+  '''cb_dev_password''',
+  '''ci_only_not_secret''',
+  '''example\.invalid''',
+]

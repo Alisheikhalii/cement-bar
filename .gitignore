@@ -6,6 +6,7 @@ build/
 .next/
 out/
 .turbo/
+.tmp/
 coverage/
 *.tsbuildinfo
 # env & secrets (repo is PUBLIC)
