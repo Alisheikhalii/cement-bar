@@ -1,0 +1,33 @@
+# deps & builds
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+.turbo/
+coverage/
+*.tsbuildinfo
+# env & secrets (repo is PUBLIC)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+# runtime data
+uploads/
+backups/
+*.log
+# test artifacts
+playwright-report/
+test-results/
+infra/k6/results/
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+# local claude settings
+.claude/settings.local.json
