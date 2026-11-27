@@ -1,0 +1,14 @@
+{
+  "name": "سالن اعلام بار مجازی — سیمان خاکستری نی‌ریز",
+  "short_name": "سالن اعلام بار",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F1F5F9",
+  "theme_color": "#1e40af",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
