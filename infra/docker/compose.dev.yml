@@ -1,0 +1,28 @@
+# Local development dependencies only (postgres + redis). Apps run on the host via `pnpm dev`.
+name: cement-bar-dev
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cb
+      POSTGRES_PASSWORD: cb_dev_password
+      POSTGRES_DB: cement_bar
+      TZ: UTC
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cb -d cement_bar"]
+      interval: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+volumes:
+  pgdata: {}
+  redisdata: {}
