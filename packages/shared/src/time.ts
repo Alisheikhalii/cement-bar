@@ -1,4 +1,4 @@
-import { format as jFormat } from 'date-fns-jalali';
+import { endOfMonth as jEndOfMonth, format as jFormat, newDate as jNewDate } from 'date-fns-jalali';
 import { faDigits } from './digits';
 
 export const BUSINESS_TZ = 'Asia/Tehran';
@@ -84,4 +84,20 @@ export function jalaliYearMonth(at: Date, tz: string = BUSINESS_TZ): string {
 
 export function formatDateTimeFa(at: Date | string): string {
   return toJalali(at, 'yyyy/MM/dd HH:mm');
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+/** Jalali year-month "1405-09" of a local ISO date "2026-11-27" (quota month of an announcement). */
+export function isoDateToJalaliYearMonth(date: string): string {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number) as [number, number, number];
+  return jFormat(new Date(y, m - 1, d), 'yyyy-MM');
+}
+
+/** Gregorian local ISO date range [from, to] (inclusive) covered by Jalali month "1405-09". */
+export function jalaliMonthRange(yearMonth: string): { from: string; to: string } {
+  const [jy, jm] = yearMonth.split('-').map(Number) as [number, number];
+  const first = jNewDate(jy, jm - 1, 1);
+  return { from: isoOf(first), to: isoOf(jEndOfMonth(first)) };
 }

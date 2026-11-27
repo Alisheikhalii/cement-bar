@@ -48,16 +48,50 @@ export async function createFixture(t: TestApp): Promise<Fixture> {
   }
 }
 
-/** Removes all rows of a test tenant (audit_logs are append-only and intentionally kept). */
+/**
+ * Removes all rows of a test tenant, children first (audit_logs and queue_events are append-only
+ * and intentionally kept; they have no FKs). Covers every tenant-scoped table so slices can call it.
+ */
 export async function disposeTenant(t: TestApp, tenantId: string): Promise<void> {
-  const { prisma } = t;
-  await prisma.session.deleteMany({ where: { user: { tenantId } } });
-  await prisma.vehicle.deleteMany({ where: { tenantId } });
-  await prisma.driver.deleteMany({ where: { tenantId } });
-  await prisma.user.deleteMany({ where: { tenantId } });
-  await prisma.loaderType.deleteMany({ where: { tenantId } });
-  await prisma.carrier.deleteMany({ where: { tenantId } });
-  await prisma.tenant.delete({ where: { id: tenantId } });
+  const { prisma: p } = t;
+  const w = { where: { tenantId } };
+  await p.cancelRequest.deleteMany(w);
+  await p.reservation.deleteMany(w);
+  await p.bulkWindow.deleteMany(w);
+  await p.bulkDay.deleteMany(w);
+  await p.bulkGroupMember.deleteMany(w);
+  await p.bulkGroup.deleteMany(w);
+  await p.bulkRotationState.deleteMany(w);
+  await p.bagPriority.deleteMany(w);
+  await p.bagTurn.deleteMany(w);
+  await p.allocationRun.deleteMany(w);
+  await p.loadUnitAllocationChange.deleteMany(w);
+  await p.loadUnit.deleteMany(w);
+  await p.announcement.deleteMany(w);
+  await p.hallDay.deleteMany(w);
+  await p.hallSchedule.deleteMany(w);
+  await p.queuePolicy.deleteMany(w);
+  await p.hall.deleteMany(w);
+  await p.dailyFile.deleteMany(w);
+  await p.carrierQuota.deleteMany(w);
+  await p.party.deleteMany(w);
+  await p.goodsOwner.deleteMany(w);
+  await p.loadingLocation.deleteMany(w);
+  await p.cargoDescription.deleteMany(w);
+  await p.loadingCondition.deleteMany(w);
+  await p.destination.deleteMany(w);
+  await p.packagingType.deleteMany(w);
+  await p.product.deleteMany(w);
+  await p.driverPenalty.deleteMany(w);
+  await p.notification.deleteMany(w);
+  await p.session.deleteMany({ where: { user: { tenantId } } });
+  await p.vehicle.deleteMany(w);
+  await p.driver.deleteMany(w);
+  await p.user.deleteMany(w);
+  await p.loaderType.deleteMany(w);
+  await p.carrier.deleteMany(w);
+  await p.counter.deleteMany(w);
+  await p.tenant.delete({ where: { id: tenantId } });
 }
 
 async function populate(t: TestApp, tenantId: string, s: string, passwordHash: string): Promise<Fixture> {

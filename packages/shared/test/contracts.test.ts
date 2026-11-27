@@ -106,3 +106,13 @@ describe('other contracts', () => {
     expect(unitAllocationChangeSchema.safeParse({ to: 'FREE', reason: 'مقصد خارج از فهرست' }).success).toBe(true);
   });
 });
+
+describe('jalali month helpers', () => {
+  it('maps ISO dates to Jalali months and back to ranges', async () => {
+    const { isoDateToJalaliYearMonth, jalaliMonthRange } = await import('../src');
+    expect(isoDateToJalaliYearMonth('2026-11-27')).toBe('1405-09');
+    expect(isoDateToJalaliYearMonth('2026-11-21')).toBe('1405-08');
+    expect(jalaliMonthRange('1405-09')).toEqual({ from: '2026-11-22', to: '2026-12-21' });
+    expect(jalaliMonthRange('1405-12')).toEqual({ from: '2027-02-20', to: '2027-03-20' });
+  });
+});
