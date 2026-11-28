@@ -67,6 +67,10 @@ export const BAG_SCHEDULE = { t0: '06:30', priorityEnd: '06:46', hallEnd: '14:00
 export const BULK_SCHEDULE = { t0: '07:00', hallEnd: '14:00', headMinutes: 10, freeMinutes: 5 };
 
 export const DRIVER_COUNT = 120;
+/** Bulk rotation demo data (reference scenario: 20 groups × 6 drivers on the first carrier). */
+export const BULK_GROUPS = 20;
+export const BULK_GROUP_SIZE = 6;
+export const BULK_GROUP_TITLE_PREFIX = 'گروه';
 export const PLATE_LETTERS_CYCLE = ['ع', 'ب', 'ج', 'د', 'س', 'ص', 'ط', 'ق', 'ل', 'م', 'ن', 'و', 'ه', 'ی'];
 export const FIRST_NAMES = ['علی', 'محمد', 'حسین', 'رضا', 'مهدی', 'احمد', 'حسن', 'جواد', 'مجید', 'سعید', 'امیر', 'کریم'];
 export const LAST_NAMES = [

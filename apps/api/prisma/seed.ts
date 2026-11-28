@@ -1,6 +1,6 @@
 /* Idempotent development seed: `pnpm --filter @cb/api db:seed` (re-runnable). */
 import { PrismaClient, type Strategy } from '@prisma/client';
-import { bulkPolicyParams, freePolicyParams, jalaliYearMonth, timedPolicyParams } from '@cb/shared';
+import { bulkCarrierSettings, bulkPolicyParams, freePolicyParams, jalaliYearMonth, localDate, timedPolicyParams } from '@cb/shared';
 import { loadConfig, loadDotEnv } from '../src/config/app-config';
 import { FieldCrypto } from '../src/common/crypto/field-crypto';
 import { hashPassword } from '../src/modules/auth/password.service';
@@ -151,7 +151,7 @@ async function seedDriver(ctx: DriverCtx, i: number, status: 'APPROVED' | 'PENDI
   const nid = nationalIdFor(i);
   const firstName = D.FIRST_NAMES[i % D.FIRST_NAMES.length]!;
   const lastName = D.LAST_NAMES[Math.floor(i / D.FIRST_NAMES.length) % D.LAST_NAMES.length]!;
-  const carrierId = ctx.carrierIds[i % ctx.carrierIds.length]!;
+  const carrierId = ctx.carrierIds[0]!;
   const loaderTypeId = i % 3 === 0 ? ctx.loaderIds.FLATBED! : ctx.loaderIds.BUNKER!;
   const yearLater = addYears(today, 1);
 
@@ -162,7 +162,8 @@ async function seedDriver(ctx: DriverCtx, i: number, status: 'APPROVED' | 'PENDI
   });
   const driver = await prisma.driver.upsert({
     where: { userId: user.id },
-    update: {},
+    // Demo data: all seeded drivers belong to the first carrier so the 20×6 bulk rotation exists.
+    update: { carrierId },
     create: {
       tenantId,
       userId: user.id,
@@ -213,6 +214,62 @@ async function seedCarrierOps(tenantId: string, carrierIds: string[], cityId: nu
   if (!found) await prisma.loadingLocation.create({ data: { tenantId, carrierId: null, cityId, ...D.FACTORY_LOADING_LOCATION } });
 }
 
+/**
+ * 20 groups × 6 drivers of the demo carrier (GUIDELINES §2) plus the rotation state of the
+ * reference scenario (§11 of the bulk spec): head = group 1, free cursor = group 2.
+ */
+async function seedBulkRotation(tenantId: string, carrierId: string): Promise<void> {
+  const hall = await prisma.hall.findFirst({ where: { tenantId, title: D.HALLS.bulk.title } });
+  if (!hall) return;
+  const drivers = await prisma.driver.findMany({
+    where: { tenantId, carrierId, status: 'APPROVED' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  const needed = D.BULK_GROUPS * D.BULK_GROUP_SIZE;
+  if (drivers.length < needed) return;
+  const today = isoDay(new Date(`${localDate(new Date())}T00:00:00.000Z`));
+  const groups: { id: string; memberIds: string[] }[] = [];
+  for (let g = 1; g <= D.BULK_GROUPS; g += 1) {
+    const title = `${D.BULK_GROUP_TITLE_PREFIX} ${g}`;
+    const found = await prisma.bulkGroup.findFirst({ where: { tenantId, carrierId, hallId: hall.id, title } });
+    const group =
+      found ??
+      (await prisma.bulkGroup.create({
+        data: { tenantId, carrierId, hallId: hall.id, title, sortOrder: g - 1 },
+      }));
+    const memberIds = drivers.slice((g - 1) * D.BULK_GROUP_SIZE, g * D.BULK_GROUP_SIZE).map((d) => d.id);
+    for (const driverId of memberIds) {
+      const exists = await prisma.bulkGroupMember.findFirst({ where: { groupId: group.id, driverId } });
+      if (!exists) {
+        await prisma.bulkGroupMember.create({ data: { tenantId, groupId: group.id, driverId, effectiveFrom: today } });
+      }
+    }
+    groups.push({ id: group.id, memberIds });
+  }
+  const state = await prisma.bulkRotationState.findUnique({
+    where: { carrierId_hallId: { carrierId, hallId: hall.id } },
+  });
+  if (!state) {
+    const head = groups[0];
+    const cursor = groups[1];
+    if (head && cursor) {
+      await prisma.bulkRotationState.create({
+        data: {
+          tenantId,
+          carrierId,
+          hallId: hall.id,
+          nextHeadGroupId: head.id,
+          cursorGroupId: cursor.id,
+          cursorRemaining: cursor.memberIds,
+          cursorInitialized: true,
+          settings: bulkCarrierSettings.parse({}),
+        },
+      });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const started = Date.now();
   // Hash each distinct password once (argon2id is intentionally slow).
@@ -237,8 +294,12 @@ async function main(): Promise<void> {
   };
   for (let i = 1; i <= D.DRIVER_COUNT; i += 1) await seedDriver(ctx, i, 'APPROVED');
   await seedDriver(ctx, D.DRIVER_COUNT + 1, 'PENDING');
+  await seedBulkRotation(tenantId, carrierIds[0]!);
   const drivers = await prisma.driver.count({ where: { tenantId } });
-  console.log(`seed ok: tenant=${tenantId} drivers=${drivers} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+  const groups = await prisma.bulkGroup.count({ where: { tenantId } });
+  console.log(
+    `seed ok: tenant=${tenantId} drivers=${drivers} groups=${groups} in ${((Date.now() - started) / 1000).toFixed(1)}s`,
+  );
 }
 
 main()
