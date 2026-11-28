@@ -109,6 +109,33 @@ export type AnnouncementView = (typeof ANNOUNCEMENT_VIEWS)[number];
 export const CANCEL_REQUEST_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
 export type CancelRequestStatus = (typeof CANCEL_REQUEST_STATUSES)[number];
 
+export const BULK_WINDOW_KINDS = ['HEAD', 'FREE'] as const;
+export type BulkWindowKind = (typeof BULK_WINDOW_KINDS)[number];
+
+export const BULK_WINDOW_CLOSE_REASONS = ['TIME', 'EXHAUSTED', 'ALL_RESERVED', 'MANUAL', 'HALL_END', 'HALTED'] as const;
+export type BulkWindowCloseReason = (typeof BULK_WINDOW_CLOSE_REASONS)[number];
+export const BULK_WINDOW_KIND_LABELS_FA: Record<BulkWindowKind, string> = {
+  HEAD: 'سرنوبت',
+  FREE: 'صف آزاد',
+};
+export const BULK_CLOSE_REASON_LABELS_FA: Record<BulkWindowCloseReason, string> = {
+  TIME: 'پایان زمان پنجره',
+  EXHAUSTED: 'تمام شدن بار',
+  ALL_RESERVED: 'رزرو همه واجدین',
+  MANUAL: 'بستن دستی',
+  HALL_END: 'پایان سالن',
+  HALTED: 'توقف اضطراری',
+};
+
+export const BAG_TURN_STATUSES = ['WAITING', 'ALLOCATED', 'NOT_ALLOCATED', 'CANCELLED'] as const;
+export type BagTurnStatus = (typeof BAG_TURN_STATUSES)[number];
+export const BAG_TURN_STATUS_LABELS_FA: Record<BagTurnStatus, string> = {
+  WAITING: 'در انتظار تخصیص',
+  ALLOCATED: 'تخصیص یافته',
+  NOT_ALLOCATED: 'تخصیص نیافت',
+  CANCELLED: 'لغو شده',
+};
+
 export const RESERVATION_SOURCES = ['TIMED', 'GROUP', 'FREE', 'MANUAL'] as const;
 export type ReservationSource = (typeof RESERVATION_SOURCES)[number];
 
