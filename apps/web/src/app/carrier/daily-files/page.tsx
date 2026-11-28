@@ -1,8 +1,8 @@
-import { ComingSoon } from '@/components/ComingSoon';
+import { DailyFilesView } from '@/components/carrier/DailyFilesView';
 import { fa } from '@/i18n/fa';
 
 export const metadata = { title: fa.nav.carrier.dailyFiles };
 
 export default function Page() {
-  return <ComingSoon title={fa.nav.carrier.dailyFiles} />;
+  return <DailyFilesView />;
 }

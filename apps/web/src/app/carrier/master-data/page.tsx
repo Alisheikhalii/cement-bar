@@ -1,8 +1,8 @@
-import { ComingSoon } from '@/components/ComingSoon';
+import { MasterDataView } from '@/components/carrier/MasterDataView';
 import { fa } from '@/i18n/fa';
 
 export const metadata = { title: fa.nav.carrier.masterData };
 
 export default function Page() {
-  return <ComingSoon title={fa.nav.carrier.masterData} />;
+  return <MasterDataView />;
 }
