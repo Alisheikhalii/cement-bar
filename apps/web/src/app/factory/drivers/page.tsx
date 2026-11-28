@@ -1,8 +1,8 @@
-import { ComingSoon } from '@/components/ComingSoon';
+import { DriversPage } from '@/components/factory/DriversPage';
 import { fa } from '@/i18n/fa';
 
 export const metadata = { title: fa.nav.factory.drivers };
 
 export default function Page() {
-  return <ComingSoon title={fa.nav.factory.drivers} />;
+  return <DriversPage />;
 }
