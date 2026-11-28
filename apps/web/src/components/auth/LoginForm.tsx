@@ -29,7 +29,7 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
     clearErrors,
   } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema, { errorMap: faErrorMap }),
+    resolver: zodResolver(loginSchema, { error: faErrorMap }),
     defaultValues: { identifier: '', password: '' },
   });
 

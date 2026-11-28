@@ -72,3 +72,13 @@ export const FIRST_NAMES = ['علی', 'محمد', 'حسین', 'رضا', 'مهد�
 export const LAST_NAMES = [
   'احمدی', 'محمدی', 'حسینی', 'رضایی', 'کریمی', 'موسوی', 'جعفری', 'صادقی', 'رحیمی', 'نوری', 'قاسمی', 'زارعی',
 ];
+
+/** Seeded monthly quota per carrier (kg) — 5,000 tonnes. */
+export const MONTHLY_QUOTA_KG = 5_000_000;
+
+/** Tenant-wide loading location (carrierId = null), visible to every carrier. */
+export const FACTORY_LOADING_LOCATION = {
+  warehouseType: 'کارخانه',
+  name: 'انبار کارخانه سیمان نی‌ریز',
+  address: 'نی‌ریز، کیلومتر ۵ جاده شیراز',
+} as const;

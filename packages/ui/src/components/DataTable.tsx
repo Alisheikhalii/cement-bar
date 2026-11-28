@@ -45,6 +45,9 @@ export interface DataTableProps<T> {
   onSelectedIdsChange?: (ids: string[]) => void;
   /** Colour of the mobile card strip. */
   rowTone?: (row: T) => Tone;
+  /** Controlled column visibility (e.g. persisted per user). Uncontrolled when omitted. */
+  columnVisibility?: VisibilityState;
+  onColumnVisibilityChange?: (v: VisibilityState) => void;
   toolbar?: ReactNode;
   caption?: string;
   className?: string;
@@ -57,7 +60,9 @@ function resolve<S>(u: Updater<S>, prev: S): S {
 export function DataTable<T>(props: DataTableProps<T>) {
   const { data, getRowId, loading, error, emptyText, pagination, selectable, rowTone, toolbar, caption } = props;
   const [localSorting, setLocalSorting] = useState<SortingState>([]);
-  const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [localVisibility, setLocalVisibility] = useState<VisibilityState>({});
+  const visibility = props.columnVisibility ?? localVisibility;
+  const setVisibility = (v: VisibilityState) => (props.onColumnVisibilityChange ?? setLocalVisibility)(v);
   const [localSelection, setLocalSelection] = useState<RowSelectionState>({});
   const serverSort = props.onSortingChange !== undefined;
   const sorting = props.sorting ?? localSorting;
@@ -99,7 +104,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
       if (serverSort) props.onSortingChange?.(next);
       else setLocalSorting(next);
     },
-    onColumnVisibilityChange: setVisibility,
+    onColumnVisibilityChange: (u) => setVisibility(resolve(u, visibility)),
     onRowSelectionChange: (u) => {
       const next = resolve(u, selection);
       setLocalSelection(next);

@@ -7,7 +7,9 @@ import { ArrowLeft, ArrowRight, CheckCircle2, UserPlus } from 'lucide-react';
 import { enDigits, faDigits } from '@cb/shared';
 import { Alert, Button3D, button3DClasses, cn } from '@cb/ui';
 import { fa } from '@/i18n/fa';
-import { api, errorMessage } from '@/lib/api';
+import { faDriver } from '@/i18n/driver';
+import { ApiError, api, errorMessage } from '@/lib/api';
+import { errorField } from '@/components/driver/format';
 import { faErrorMap } from '@/lib/zod-fa';
 import { AuthCard } from './AuthCard';
 import { registerFormSchema, type RegisterForm } from './register-data';
@@ -51,7 +53,7 @@ export function RegisterWizard() {
   const [serverError, setServerError] = useState<string | null>(null);
   const form = useForm<RegisterForm>({
     // raw: submit the un-transformed input (API expects plate as {two,letter,three,iran}).
-    resolver: zodResolver(registerFormSchema, { errorMap: faErrorMap }, { raw: true }),
+    resolver: zodResolver(registerFormSchema, { error: faErrorMap }, { raw: true }),
     mode: 'onTouched',
     defaultValues: {
       mobile: '',
@@ -86,7 +88,20 @@ export function RegisterWizard() {
       await api.post('/auth/register-driver', { ...body, mobile: enDigits(body.mobile) });
       setDone(true);
     } catch (e) {
-      setServerError(errorMessage(e));
+      // Point the driver at the offending field/step (e.g. mobile already registered, plate taken).
+      const field = e instanceof ApiError ? errorField(e.details) : undefined;
+      const stepIdx = field
+        ? STEP_FIELDS.findIndex((fs) => fs.some((f) => f === field || f.startsWith(`${field}.`)))
+        : -1;
+      if (field && stepIdx >= 0) {
+        const msg =
+          e instanceof ApiError && e.code === 'CONFLICT'
+            ? (faDriver.register.conflict[field] ?? e.message)
+            : faDriver.register.invalidField;
+        setStep(stepIdx);
+        form.setError(field as FieldPath<RegisterForm>, { message: msg }, { shouldFocus: true });
+        setServerError(msg);
+      } else setServerError(errorMessage(e));
     }
   });
 
@@ -96,7 +111,7 @@ export function RegisterWizard() {
         <div className="flex flex-col items-center gap-space-md text-center">
           <CheckCircle2 className="size-14 text-success" aria-hidden />
           <p role="status" className="text-headline-sm text-text-primary">
-            {r.success}
+            {faDriver.register.success}
           </p>
           <Link href="/login" className={button3DClasses({ variant: 'primary', fullWidth: true })}>
             {r.goLogin}

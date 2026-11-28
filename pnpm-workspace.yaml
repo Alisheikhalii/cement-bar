@@ -32,8 +32,3 @@ overrides:
   tmp: ^0.2.6
   webpack@5: ^5.104.1
   ajv@8: ^8.18.0
-# TEMPORARY (DECISIONS Q-M1): zod 3 memory-exhaustion DoS, fixed only in zod 4.
-# Mitigated by the API's 1 MB JSON body limit. Remove when zod 4 lands (first task of P2).
-auditConfig:
-  ignoreGhsas:
-    - GHSA-mrhx-c7xc-m3w5

@@ -102,7 +102,3 @@ id = "GHSA-82fw-gwwq-j7x9"
 ignoreUntil = 2027-01-31
 reason = "vitest@2.1.9 [moderate, dev-only] Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock. Fixed in >=4.1.11; P4: vitest 4 upgrade."
 
-[[IgnoredVulns]]
-id = "GHSA-mrhx-c7xc-m3w5"
-ignoreUntil = 2027-01-31
-reason = "zod@3.24.1 [high, prod; mitigated by 1 MB JSON body limit] Zod can exhaust memory while validating oversized constrained collections. Fixed in >=4.6.6; P2 task zero: zod 4 migration (Q-M1)."

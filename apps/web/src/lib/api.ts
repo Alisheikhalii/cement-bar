@@ -38,6 +38,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Internal: skip refresh-and-retry (auth endpoints themselves). */
   noRefresh?: boolean;
+  /** Accept header (default application/json). */
+  accept?: string;
 }
 
 const REFRESH_LOCK = 'cb-auth-refresh';
@@ -103,8 +105,9 @@ export function createApiClient(opts: ApiClientOptions = {}) {
   let refreshing: Promise<boolean> | null = null;
 
   async function raw(method: string, path: string, o: RequestOptions): Promise<Response> {
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    if (o.body !== undefined) headers['Content-Type'] = 'application/json';
+    const headers: Record<string, string> = { Accept: o.accept ?? 'application/json' };
+    const isForm = typeof FormData !== 'undefined' && o.body instanceof FormData;
+    if (o.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
     if (!SAFE_METHODS.has(method)) {
       const csrf = getCsrf();
       if (csrf) headers['X-CSRF'] = csrf;
@@ -116,7 +119,7 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         method,
         headers,
         credentials: 'include',
-        body: o.body === undefined ? undefined : JSON.stringify(o.body),
+        body: o.body === undefined ? undefined : isForm ? (o.body as FormData) : JSON.stringify(o.body),
         signal: o.signal,
       });
     } catch (e) {
@@ -147,7 +150,8 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     return refreshing;
   }
 
-  async function request<T>(method: string, path: string, o: RequestOptions = {}): Promise<T> {
+  /** Sends with refresh-and-retry; throws ApiError on non-2xx. */
+  async function send(method: string, path: string, o: RequestOptions = {}): Promise<Response> {
     let res = await raw(method, path, o);
     if (res.status === 401 && !o.noRefresh && !NO_REFRESH_PATHS.includes(path)) {
       const body = await parseBody(res);
@@ -168,9 +172,20 @@ export function createApiClient(opts: ApiClientOptions = {}) {
         throw again;
       }
     }
-    const body = await parseBody(res);
-    if (!res.ok) throw toApiError(res.status, body);
-    return body as T;
+    if (!res.ok) throw toApiError(res.status, await parseBody(res));
+    return res;
+  }
+
+  async function request<T>(method: string, path: string, o: RequestOptions = {}): Promise<T> {
+    return (await parseBody(await send(method, path, o))) as T;
+  }
+
+  /** GET a file (e.g. ?format=xlsx). Filename from Content-Disposition when present. */
+  async function download(path: string, o: Omit<RequestOptions, 'body'> = {}): Promise<{ blob: Blob; filename: string | null }> {
+    const res = await send('GET', path, { ...o, accept: o.accept ?? '*/*' });
+    const cd = res.headers.get('Content-Disposition') ?? '';
+    const m = /filename="?([^";]+)"?/.exec(cd);
+    return { blob: await res.blob(), filename: m?.[1] ?? null };
   }
 
   return {
@@ -180,6 +195,9 @@ export function createApiClient(opts: ApiClientOptions = {}) {
     put: <T>(path: string, body?: unknown, o?: RequestOptions) => request<T>('PUT', path, { ...o, body }),
     patch: <T>(path: string, body?: unknown, o?: RequestOptions) => request<T>('PATCH', path, { ...o, body }),
     del: <T>(path: string, o?: RequestOptions) => request<T>('DELETE', path, o),
+    /** multipart/form-data POST (browser sets the boundary). */
+    upload: <T>(path: string, form: FormData, o?: Omit<RequestOptions, 'body'>) => request<T>('POST', path, { ...o, body: form }),
+    download,
   };
 }
 

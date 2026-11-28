@@ -18,7 +18,7 @@ export const zMobile = z
   .transform((v, ctx) => {
     const m = normalizeMobile(v);
     if (!m) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'شماره موبایل معتبر نیست' });
+      ctx.addIssue({ code: 'custom', message: 'شماره موبایل معتبر نیست' });
       return z.NEVER;
     }
     return m;
@@ -45,7 +45,7 @@ export const zPlate = z
   .transform((p, ctx) => {
     const f = formatPlate(p);
     if (!f) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'پلاک معتبر نیست' });
+      ctx.addIssue({ code: 'custom', message: 'پلاک معتبر نیست' });
       return z.NEVER;
     }
     return f;
@@ -63,7 +63,7 @@ export const listQuerySchema = z
     q: z.string().trim().max(100).optional(),
     format: z.enum(['json', 'xlsx']).default('json'),
   })
-  .passthrough(); // column filters as f_<column>=value are validated per-resource
+  .loose(); // column filters as f_<column>=value are validated per-resource
 export type ListQuery = z.infer<typeof listQuerySchema>;
 
 export interface Paginated<T> {
@@ -163,7 +163,7 @@ export const policyParamsByStrategy = {
   TIMED_PRIORITY_RESERVATION: timedPolicyParams,
   BULK_GROUP_ROTATION: bulkPolicyParams,
   FREE_FIRST_COME: freePolicyParams,
-} as const satisfies Record<(typeof STRATEGIES)[number], z.ZodTypeAny>;
+} as const satisfies Record<(typeof STRATEGIES)[number], z.ZodType>;
 
 export type TimedPolicyParams = z.infer<typeof timedPolicyParams>;
 export type BulkPolicyParams = z.infer<typeof bulkPolicyParams>;

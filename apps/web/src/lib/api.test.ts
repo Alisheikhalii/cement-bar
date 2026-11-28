@@ -121,3 +121,35 @@ describe('api client — refresh on 401', () => {
     expect(onAuthFailure).not.toHaveBeenCalled();
   });
 });
+
+describe('download / upload', () => {
+  it('download returns the blob and the Content-Disposition filename', async () => {
+    const { client, calls } = setup(
+      () =>
+        new Response('xlsx-bytes', {
+          status: 200,
+          headers: { 'Content-Disposition': 'attachment; filename="announcements.xlsx"' },
+        }),
+    );
+    const r = await client.download('/carrier/announcements', { query: { format: 'xlsx' } });
+    expect(r.filename).toBe('announcements.xlsx');
+    expect(await r.blob.text()).toBe('xlsx-bytes');
+    expect(calls[0]!.url).toContain('format=xlsx');
+    expect(header(calls[0]!.init, 'Accept')).toBe('*/*');
+  });
+
+  it('download surfaces API errors as ApiError', async () => {
+    const { client } = setup(() => json(403, { error: { code: 'FORBIDDEN', message: 'x' } }));
+    await expect(client.download('/factory/reports/permits')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('upload sends FormData untouched with CSRF and no JSON content-type', async () => {
+    const { client, calls } = setup(() => json(201, { id: 'f1' }));
+    const form = new FormData();
+    form.set('note', 'x');
+    await expect(client.upload<{ id: string }>('/factory/daily-files', form)).resolves.toEqual({ id: 'f1' });
+    expect(calls[0]!.init.body).toBe(form);
+    expect(header(calls[0]!.init, 'Content-Type')).toBeUndefined();
+    expect(header(calls[0]!.init, 'X-CSRF')).toBe('tok123');
+  });
+});
