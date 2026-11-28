@@ -1,14 +1,19 @@
 {
+  "id": "/",
   "name": "سالن اعلام بار مجازی — سیمان خاکستری نی‌ریز",
   "short_name": "سالن اعلام بار",
+  "description": "سامانه نوبت‌دهی و اعلام بار مجازی کارخانه سیمان خاکستری نی‌ریز",
   "lang": "fa",
   "dir": "rtl",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#F1F5F9",
   "theme_color": "#1e40af",
+  "categories": ["business", "productivity"],
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }
