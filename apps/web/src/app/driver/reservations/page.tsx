@@ -1,8 +1,8 @@
-import { ComingSoon } from '@/components/ComingSoon';
+import { ReservationsView } from '@/components/driver/queue/ReservationsView';
 import { fa } from '@/i18n/fa';
 
 export const metadata = { title: fa.nav.driver.reservations };
 
 export default function Page() {
-  return <ComingSoon title={fa.nav.driver.reservations} />;
+  return <ReservationsView />;
 }

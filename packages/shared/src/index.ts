@@ -11,3 +11,4 @@ export * from './dto/factory';
 export * from './dto/carrier';
 export * from './dto/announcements';
 export * from './dto/driver';
+export * from './dto/queue';

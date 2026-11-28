@@ -1,7 +1,7 @@
 {
   "name": "cement-bar",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "packageManager": "pnpm@11.11.0",
   "engines": { "node": ">=22" },
   "scripts": {
@@ -15,6 +15,7 @@
     "e2e": "pnpm --filter @cb/web e2e",
     "db:migrate": "pnpm --filter @cb/api db:migrate",
     "db:seed": "pnpm --filter @cb/api db:seed",
+    "demo:day": "pnpm --filter @cb/api demo:day",
     "format": "prettier --write ."
   },
   "devDependencies": {

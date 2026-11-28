@@ -32,6 +32,7 @@ pnpm dev                                                 # web :3000 · api :400
 | `pnpm lint && pnpm typecheck && pnpm test` | gate قبل از هر commit |
 | `pnpm test:engine` | تست‌های مرجع الگوریتم نوبت‌دهی |
 | `pnpm test:int` | تست integration (نیازمند postgres و redis) |
+| `pnpm demo:day` | شبیه‌سازی سریع یک روز کامل کیسه‌ای و فله روی seed با `FakeClock` |
 | `pnpm e2e` | Playwright |
 | `pnpm db:migrate` / `pnpm db:seed` | migration و داده نمونه |
 
@@ -78,7 +79,7 @@ pnpm dev                        # web :3000, api :4000
 ```
 
 ### Commands
-`pnpm dev` · `pnpm build` · `pnpm lint && pnpm typecheck && pnpm test` (pre-commit gate) · `pnpm test:engine` · `pnpm test:int` · `pnpm e2e` · `pnpm db:migrate` · `pnpm db:seed`
+`pnpm dev` · `pnpm build` · `pnpm lint && pnpm typecheck && pnpm test` (pre-commit gate) · `pnpm test:engine` · `pnpm test:int` · `pnpm demo:day` · `pnpm e2e` · `pnpm db:migrate` · `pnpm db:seed`
 
 ### Docs
 `CLAUDE.md` (agent rules) · `docs/PRD.md` · `docs/SPEC.md` · `docs/GUIDELINES.md` · `docs/PLAN.md` · `docs/DECISIONS.md` · `docs/RUNBOOK.md` (P4).

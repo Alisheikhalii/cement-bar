@@ -32,7 +32,7 @@ export const Roles = (...roles: Role[]): MethodDecorator & ClassDecorator => Set
 /** Exempt from the X-CSRF double-submit check (Origin check still applies). */
 export const SkipCsrf = (): MethodDecorator & ClassDecorator => SetMetadata(SKIP_CSRF, true);
 
-export type RateBucket = 'login' | 'register';
+export type RateBucket = 'login' | 'register' | 'turn' | 'reserve';
 /** Apply a named Redis-backed rate-limit bucket in addition to the global one. */
 export const RateLimitBucket = (bucket: RateBucket): MethodDecorator => SetMetadata(RATE_BUCKET, bucket);
 
