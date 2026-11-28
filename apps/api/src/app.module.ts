@@ -18,7 +18,10 @@ import { FactoryModule } from './modules/factory/factory.module';
 import { OpsModule } from './modules/ops/ops.module';
 import { PingModule } from './modules/ping/ping.module';
 import { PublicModule } from './modules/public/public.module';
+import { QueueModule } from './modules/queue/queue.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { RateLimitModule } from './modules/throttle/rate-limit.module';
+import { UserRateLimitGuard } from './modules/throttle/user-rate-limit.guard';
 import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
@@ -42,12 +45,16 @@ import { ReportsModule } from './modules/reports/reports.module';
     CarrierModule,
     ReportsModule,
     DriverModule,
+    // Phase 3 queue engine + realtime
+    RealtimeModule,
+    QueueModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    // Order matters: rate limit → authentication → CSRF → roles.
+    // Order matters: IP rate limit → authentication → per-driver rate limit → CSRF → roles.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: UserRateLimitGuard },
     { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

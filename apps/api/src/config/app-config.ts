@@ -53,6 +53,9 @@ export const RATE_LIMITS = {
   global: { ttlMs: 1000, limit: 100 },
   login: { ttlMs: 60_000, limit: 5 },
   register: { ttlMs: 60_000, limit: 5 },
+  /** SPEC §6: turn registration and reservations are limited per driver (authenticated user). */
+  turn: { ttlMs: 1000, limit: 5 },
+  reserve: { ttlMs: 1000, limit: 5 },
 } as const;
 
 /** Loads `.env` (if present) into process.env without overriding existing vars. */
